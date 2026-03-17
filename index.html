@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead Flow CRM</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .status-badge { transition: all 0.2s ease; }
+    .lead-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .lead-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .tab-active { border-bottom: 3px solid #6366f1; color: #6366f1; }
+    .modal-overlay { backdrop-filter: blur(4px); }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide { animation: slideIn 0.3s ease; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .loading-pulse { animation: pulse 1.5s ease-in-out infinite; }
+    .toast { animation: slideIn 0.3s ease; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-slate-50 overflow-auto">
+  <div id="app" class="h-full w-full flex flex-col"><!-- Header -->
+   <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 shadow-lg">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+     <div>
+      <h1 id="app-title" class="text-2xl font-bold">Lead Flow CRM</h1>
+      <p id="welcome-msg" class="text-indigo-100 text-sm">Manage your leads efficiently</p>
+     </div>
+     <div class="flex items-center gap-4">
+      <div id="stats-summary" class="hidden md:flex items-center gap-6 text-sm">
+       <div class="text-center">
+        <div id="total-leads" class="text-2xl font-bold">
+         0
+        </div>
+        <div class="text-indigo-200">
+         Total
+        </div>
+       </div>
+       <div class="text-center">
+        <div id="new-leads" class="text-2xl font-bold text-yellow-300">
+         0
+        </div>
+        <div class="text-indigo-200">
+         New
+        </div>
+       </div>
+       <div class="text-center">
+        <div id="converted-leads" class="text-2xl font-bold text-green-300">
+         0
+        </div>
+        <div class="text-indigo-200">
+         Converted
+        </div>
+       </div>
+      </div><button id="add-lead-btn" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-semibold hover:bg-indigo-50 transition flex items-center gap-2">
+       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+       </svg> Add Lead </button>
+     </div>
+    </div>
+   </header><!-- Filters & Search -->
+   <div class="bg-white border-b px-6 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center gap-4">
+     <div class="flex-1 min-w-64">
+      <div class="relative">
+       <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+       </svg><input type="text" id="search-input" placeholder="Search leads by name, email, or company..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+      </div>
+     </div>
+     <div class="flex items-center gap-2"><button data-filter="all" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-indigo-100 text-indigo-700">All</button> <button data-filter="new" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">New</button> <button data-filter="contacted" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Contacted</button> <button data-filter="converted" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Converted</button>
+     </div><select id="source-filter" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 focus:ring-2 focus:ring-indigo-500"> <option value="">All Sources</option> <option value="Website">Website</option> <option value="Referral">Referral</option> <option value="Social Media">Social Media</option> <option value="Email Campaign">Email Campaign</option> <option value="Cold Call">Cold Call</option> <option value="Other">Other</option> </select>
+    </div>
+   </div><!-- Main Content -->
+   <main class="flex-1 overflow-auto p-6">
+    <div class="max-w-7xl mx-auto"><!-- Empty State -->
+     <div id="empty-state" class="hidden text-center py-16">
+      <div class="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+       <svg class="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+       </svg>
+      </div>
+      <h3 class="text-xl font-semibold text-gray-800 mb-2">No leads yet</h3>
+      <p class="text-gray-500 mb-6">Start by adding your first lead to track potential clients</p><button id="empty-add-btn" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"> Add Your First Lead </button>
+     </div><!-- Loading State -->
+     <div id="loading-state" class="text-center py-16">
+      <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4 animate-spin"></div>
+      <p class="text-gray-500">Loading leads...</p>
+     </div><!-- Leads Grid -->
+     <div id="leads-grid" class="hidden grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+     </div><!-- Limit Warning -->
+     <div id="limit-warning" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+      <div class="flex items-center gap-3">
+       <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+       </svg>
+       <p class="text-amber-800 font-medium">You've reached the maximum limit of 999 leads. Please delete some leads to add more.</p>
+      </div>
+     </div>
+    </div>
+   </main><!-- Add/Edit Lead Modal -->
+   <div id="lead-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90%] overflow-auto animate-slide">
+     <div class="p-6 border-b">
+      <div class="flex items-center justify-between">
+       <h2 id="modal-title" class="text-xl font-bold text-gray-800">Add New Lead</h2><button id="close-modal" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg></button>
+      </div>
+     </div>
+     <form id="lead-form" class="p-6 space-y-4"><input type="hidden" id="lead-id">
+      <div class="grid grid-cols-2 gap-4">
+       <div><label for="lead-name" class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label> <input type="text" id="lead-name" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500">
+       </div>
+       <div><label for="lead-email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label> <input type="email" id="lead-email" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500">
+       </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+       <div><label for="lead-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label> <input type="tel" id="lead-phone" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500">
+       </div>
+       <div><label for="lead-company" class="block text-sm font-medium text-gray-700 mb-1">Company</label> <input type="text" id="lead-company" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500">
+       </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+       <div><label for="lead-source" class="block text-sm font-medium text-gray-700 mb-1">Lead Source</label> <select id="lead-source" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"> <option value="Website">Website</option> <option value="Referral">Referral</option> <option value="Social Media">Social Media</option> <option value="Email Campaign">Email Campaign</option> <option value="Cold Call">Cold Call</option> <option value="Other">Other</option> </select>
+       </div>
+       <div><label for="lead-priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label> <select id="lead-priority" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"> <option value="low">Low</option> <option value="medium">Medium</option> <option value="high">High</option> </select>
+       </div>
+      </div>
+      <div><label for="lead-status" class="block text-sm font-medium text-gray-700 mb-1">Status</label> <select id="lead-status" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"> <option value="new">New</option> <option value="contacted">Contacted</option> <option value="converted">Converted</option> </select>
+      </div>
+      <div><label for="lead-notes" class="block text-sm font-medium text-gray-700 mb-1">Notes / Follow-up</label> <textarea id="lead-notes" rows="3" placeholder="Add any notes or follow-up reminders..." class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+      </div>
+      <div class="flex gap-3 pt-4"><button type="button" id="cancel-btn" class="flex-1 px-4 py-3 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition">Cancel</button> <button type="submit" id="submit-btn" class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-2"> <span id="submit-text">Save Lead</span>
+        <div id="submit-spinner" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div></button>
+      </div>
+     </form>
+    </div>
+   </div><!-- View Lead Details Modal -->
+   <div id="details-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90%] overflow-auto animate-slide">
+     <div class="p-6 border-b">
+      <div class="flex items-center justify-between">
+       <h2 class="text-xl font-bold text-gray-800">Lead Details</h2><button id="close-details" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg></button>
+      </div>
+     </div>
+     <div id="details-content" class="p-6">
+     </div>
+     <div class="p-6 border-t bg-gray-50 flex gap-3"><button id="edit-from-details" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition">Edit Lead</button> <button id="delete-from-details" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition">Delete</button>
+     </div>
+    </div>
+   </div><!-- Delete Confirmation Modal -->
+   <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide">
+     <div class="p-6 text-center">
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+       <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+       </svg>
+      </div>
+      <h3 class="text-xl font-bold text-gray-800 mb-2">Delete Lead?</h3>
+      <p class="text-gray-500 mb-6">This action cannot be undone. The lead and all associated notes will be permanently removed.</p>
+      <div class="flex gap-3"><button id="cancel-delete" class="flex-1 px-4 py-3 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition">Cancel</button> <button id="confirm-delete" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center justify-center gap-2"> <span>Delete</span>
+        <div id="delete-spinner" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div></button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Toast Notification -->
+   <div id="toast" class="hidden fixed bottom-6 right-6 z-50">
+    <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 toast">
+     <svg id="toast-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"></svg><span id="toast-message"></span>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Default configuration
+    const defaultConfig = {
+      app_title: 'Lead Flow CRM',
+      welcome_message: 'Manage your leads efficiently',
+      background_color: '#f8fafc',
+      surface_color: '#ffffff',
+      text_color: '#1e293b',
+      primary_action: '#6366f1',
+      secondary_action: '#64748b'
+    };
+
+    // App state
+    let leads = [];
+    let currentFilter = 'all';
+    let currentSourceFilter = '';
+    let searchQuery = '';
+    let editingLead = null;
+    let deletingLead = null;
+
+    // DOM Elements
+    const elements = {
+      appTitle: document.getElementById('app-title'),
+      welcomeMsg: document.getElementById('welcome-msg'),
+      searchInput: document.getElementById('search-input'),
+      sourceFilter: document.getElementById('source-filter'),
+      leadsGrid: document.getElementById('leads-grid'),
+      emptyState: document.getElementById('empty-state'),
+      loadingState: document.getElementById('loading-state'),
+      limitWarning: document.getElementById('limit-warning'),
+      leadModal: document.getElementById('lead-modal'),
+      modalTitle: document.getElementById('modal-title'),
+      leadForm: document.getElementById('lead-form'),
+      detailsModal: document.getElementById('details-modal'),
+      detailsContent: document.getElementById('details-content'),
+      deleteModal: document.getElementById('delete-modal'),
+      toast: document.getElementById('toast'),
+      toastMessage: document.getElementById('toast-message'),
+      toastIcon: document.getElementById('toast-icon'),
+      totalLeads: document.getElementById('total-leads'),
+      newLeads: document.getElementById('new-leads'),
+      convertedLeads: document.getElementById('converted-leads'),
+      submitBtn: document.getElementById('submit-btn'),
+      submitText: document.getElementById('submit-text'),
+      submitSpinner: document.getElementById('submit-spinner'),
+      deleteSpinner: document.getElementById('delete-spinner')
+    };
+
+    // Toast notification
+    function showToast(message, type = 'success') {
+      const iconPaths = {
+        success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>',
+        error: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>',
+        info: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'
+      };
+      elements.toastIcon.innerHTML = iconPaths[type] || iconPaths.info;
+      elements.toastMessage.textContent = message;
+      elements.toast.classList.remove('hidden');
+      setTimeout(() => elements.toast.classList.add('hidden'), 3000);
+    }
+
+    // Format date
+    function formatDate(isoString) {
+      if (!isoString) return 'N/A';
+      const date = new Date(isoString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Get status badge HTML
+    function getStatusBadge(status) {
+      const styles = {
+        new: 'bg-yellow-100 text-yellow-800',
+        contacted: 'bg-blue-100 text-blue-800',
+        converted: 'bg-green-100 text-green-800'
+      };
+      return `<span class="status-badge px-3 py-1 rounded-full text-xs font-medium ${styles[status] || styles.new}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>`;
+    }
+
+    // Get priority badge HTML
+    function getPriorityBadge(priority) {
+      const styles = {
+        low: 'bg-gray-200 text-gray-600',
+        medium: 'bg-orange-100 text-orange-600',
+        high: 'bg-red-100 text-red-600'
+      };
+      return `<span class="px-2 py-0.5 rounded text-xs font-medium ${styles[priority] || styles.low}">${priority}</span>`;
+    }
+
+    // Get source icon
+    function getSourceIcon(source) {
+      const icons = {
+        'Website': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>',
+        'Referral': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>',
+        'Social Media': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>',
+        'Email Campaign': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>',
+        'Cold Call': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>'
+      };
+      return icons[source] || '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+    }
+
+    // Filter and search leads
+    function getFilteredLeads() {
+      return leads.filter(lead => {
+        const matchesStatus = currentFilter === 'all' || lead.status === currentFilter;
+        const matchesSource = !currentSourceFilter || lead.source === currentSourceFilter;
+        const matchesSearch = !searchQuery || 
+          (lead.name && lead.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (lead.email && lead.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (lead.company && lead.company.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesStatus && matchesSource && matchesSearch;
+      });
+    }
+
+    // Update statistics
+    function updateStats() {
+      const total = leads.length;
+      const newCount = leads.filter(l => l.status === 'new').length;
+      const convertedCount = leads.filter(l => l.status === 'converted').length;
+      
+      elements.totalLeads.textContent = total;
+      elements.newLeads.textContent = newCount;
+      elements.convertedLeads.textContent = convertedCount;
+    }
+
+    // Render leads
+    function renderLeads() {
+      const filtered = getFilteredLeads();
+      
+      elements.loadingState.classList.add('hidden');
+      
+      if (leads.length === 0) {
+        elements.emptyState.classList.remove('hidden');
+        elements.leadsGrid.classList.add('hidden');
+        return;
+      }
+      
+      elements.emptyState.classList.add('hidden');
+      elements.leadsGrid.classList.remove('hidden');
+      
+      if (filtered.length === 0) {
+        elements.leadsGrid.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-gray-500">No leads match your search or filter criteria</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Track existing cards
+      const existingCards = new Map(
+        [...elements.leadsGrid.children].map(el => [el.dataset.leadId, el])
+      );
+
+      // Update or create cards
+      filtered.forEach((lead, index) => {
+        const existingCard = existingCards.get(lead.__backendId);
+        const cardHTML = createLeadCardHTML(lead);
+        
+        if (existingCard) {
+          existingCard.outerHTML = cardHTML;
+          existingCards.delete(lead.__backendId);
+        } else {
+          const temp = document.createElement('div');
+          temp.innerHTML = cardHTML;
+          elements.leadsGrid.appendChild(temp.firstElementChild);
+        }
+      });
+
+      // Remove deleted cards
+      existingCards.forEach(card => card.remove());
+
+      // Re-attach event listeners
+      attachCardListeners();
+    }
+
+    // Create lead card HTML
+    function createLeadCardHTML(lead) {
+      return `
+        <div class="lead-card bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden cursor-pointer" data-lead-id="${lead.__backendId}">
+          <div class="p-5">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                  ${(lead.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 class="font-semibold text-gray-800">${lead.name || 'Unknown'}</h3>
+                  <p class="text-sm text-gray-500">${lead.email || 'No email'}</p>
+                </div>
+              </div>
+              ${getStatusBadge(lead.status || 'new')}
+            </div>
+            <div class="space-y-2 text-sm">
+              ${lead.company ? `<div class="flex items-center gap-2 text-gray-600"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>${lead.company}</div>` : ''}
+              <div class="flex items-center gap-2 text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">${getSourceIcon(lead.source)}</svg>
+                ${lead.source || 'Unknown source'}
+              </div>
+            </div>
+            <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div class="flex items-center gap-2">
+                ${getPriorityBadge(lead.priority || 'low')}
+                <span class="text-xs text-gray-400">${formatDate(lead.created_at)}</span>
+              </div>
+              <div class="flex gap-1">
+                <button class="quick-status p-2 hover:bg-gray-100 rounded-lg transition" data-id="${lead.__backendId}" data-action="status" title="Change status">
+                  <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </button>
+                <button class="quick-edit p-2 hover:bg-gray-100 rounded-lg transition" data-id="${lead.__backendId}" data-action="edit" title="Edit lead">
+                  <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Attach event listeners to cards
+    function attachCardListeners() {
+      document.querySelectorAll('.lead-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.quick-status') || e.target.closest('.quick-edit')) return;
+          const leadId = card.dataset.leadId;
+          const lead = leads.find(l => l.__backendId === leadId);
+          if (lead) showLeadDetails(lead);
+        });
+      });
+
+      document.querySelectorAll('.quick-status').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const leadId = btn.dataset.id;
+          const lead = leads.find(l => l.__backendId === leadId);
+          if (lead) {
+            const statusOrder = ['new', 'contacted', 'converted'];
+            const currentIndex = statusOrder.indexOf(lead.status || 'new');
+            const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+            
+            btn.innerHTML = '<div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>';
+            
+            const updatedLead = { ...lead, status: nextStatus, last_contacted: new Date().toISOString() };
+            const result = await window.dataSdk.update(updatedLead);
+            
+            if (result.isOk) {
+              showToast(`Status updated to ${nextStatus}`);
+            } else {
+              showToast('Failed to update status', 'error');
+            }
+          }
+        });
+      });
+
+      document.querySelectorAll('.quick-edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const leadId = btn.dataset.id;
+          const lead = leads.find(l => l.__backendId === leadId);
+          if (lead) openEditModal(lead);
+        });
+      });
+    }
+
+    // Show lead details modal
+    function showLeadDetails(lead) {
+      editingLead = lead;
+      elements.detailsContent.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+              ${(lead.name || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-gray-800">${lead.name || 'Unknown'}</h3>
+              <p class="text-gray-500">${lead.company || 'No company'}</p>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-500 mb-1">Status</div>
+              ${getStatusBadge(lead.status || 'new')}
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-500 mb-1">Priority</div>
+              ${getPriorityBadge(lead.priority || 'low')}
+            </div>
+          </div>
+          
+          <div class="space-y-3">
+            <div class="flex items-center gap-3 text-gray-600">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              <a href="mailto:${lead.email}" class="text-indigo-600 hover:underline">${lead.email || 'No email'}</a>
+            </div>
+            <div class="flex items-center gap-3 text-gray-600">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+              ${lead.phone || 'No phone'}
+            </div>
+            <div class="flex items-center gap-3 text-gray-600">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">${getSourceIcon(lead.source)}</svg>
+              ${lead.source || 'Unknown source'}
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-sm font-medium text-gray-700 mb-2">Notes & Follow-up</div>
+            <p class="text-gray-600 text-sm whitespace-pre-wrap">${lead.notes || 'No notes yet'}</p>
+          </div>
+          
+          <div class="flex items-center justify-between text-xs text-gray-400 pt-4 border-t">
+            <span>Created: ${formatDate(lead.created_at)}</span>
+            <span>Last contacted: ${formatDate(lead.last_contacted)}</span>
+          </div>
+        </div>
+      `;
+      elements.detailsModal.classList.remove('hidden');
+    }
+
+    // Open add/edit modal
+    function openModal(lead = null) {
+      editingLead = lead;
+      elements.modalTitle.textContent = lead ? 'Edit Lead' : 'Add New Lead';
+      elements.submitText.textContent = lead ? 'Update Lead' : 'Save Lead';
+      
+      document.getElementById('lead-id').value = lead ? lead.__backendId : '';
+      document.getElementById('lead-name').value = lead ? lead.name : '';
+      document.getElementById('lead-email').value = lead ? lead.email : '';
+      document.getElementById('lead-phone').value = lead ? lead.phone : '';
+      document.getElementById('lead-company').value = lead ? lead.company : '';
+      document.getElementById('lead-source').value = lead ? lead.source : 'Website';
+      document.getElementById('lead-status').value = lead ? lead.status : 'new';
+      document.getElementById('lead-priority').value = lead ? lead.priority : 'medium';
+      document.getElementById('lead-notes').value = lead ? lead.notes : '';
+      
+      elements.leadModal.classList.remove('hidden');
+    }
+
+    function openEditModal(lead) {
+      elements.detailsModal.classList.add('hidden');
+      openModal(lead);
+    }
+
+    // Close modals
+    function closeModals() {
+      elements.leadModal.classList.add('hidden');
+      elements.detailsModal.classList.add('hidden');
+      elements.deleteModal.classList.add('hidden');
+      editingLead = null;
+      deletingLead = null;
+    }
+
+    // Show delete confirmation
+    function showDeleteConfirmation(lead) {
+      deletingLead = lead;
+      elements.deleteModal.classList.remove('hidden');
+    }
+
+    // Set loading state
+    function setSubmitLoading(loading) {
+      elements.submitBtn.disabled = loading;
+      elements.submitSpinner.classList.toggle('hidden', !loading);
+      elements.submitText.textContent = loading ? 'Saving...' : (editingLead ? 'Update Lead' : 'Save Lead');
+    }
+
+    function setDeleteLoading(loading) {
+      document.getElementById('confirm-delete').disabled = loading;
+      elements.deleteSpinner.classList.toggle('hidden', !loading);
+    }
+
+    // Handle form submission
+    async function handleSubmit(e) {
+      e.preventDefault();
+      
+      if (leads.length >= 999 && !editingLead) {
+        elements.limitWarning.classList.remove('hidden');
+        showToast('Lead limit reached. Please delete some leads first.', 'error');
+        return;
+      }
+      
+      setSubmitLoading(true);
+      
+      const leadData = {
+        name: document.getElementById('lead-name').value.trim(),
+        email: document.getElementById('lead-email').value.trim(),
+        phone: document.getElementById('lead-phone').value.trim(),
+        company: document.getElementById('lead-company').value.trim(),
+        source: document.getElementById('lead-source').value,
+        status: document.getElementById('lead-status').value,
+        priority: document.getElementById('lead-priority').value,
+        notes: document.getElementById('lead-notes').value.trim()
+      };
+      
+      let result;
+      if (editingLead) {
+        const updatedLead = { 
+          ...editingLead, 
+          ...leadData,
+          last_contacted: leadData.status !== editingLead.status ? new Date().toISOString() : editingLead.last_contacted
+        };
+        result = await window.dataSdk.update(updatedLead);
+      } else {
+        leadData.created_at = new Date().toISOString();
+        leadData.last_contacted = null;
+        result = await window.dataSdk.create(leadData);
+      }
+      
+      setSubmitLoading(false);
+      
+      if (result.isOk) {
+        showToast(editingLead ? 'Lead updated successfully!' : 'Lead added successfully!');
+        closeModals();
+        elements.leadForm.reset();
+      } else {
+        showToast('Failed to save lead. Please try again.', 'error');
+      }
+    }
+
+    // Handle delete
+    async function handleDelete() {
+      if (!deletingLead) return;
+      
+      setDeleteLoading(true);
+      const result = await window.dataSdk.delete(deletingLead);
+      setDeleteLoading(false);
+      
+      if (result.isOk) {
+        showToast('Lead deleted successfully');
+        closeModals();
+      } else {
+        showToast('Failed to delete lead', 'error');
+      }
+    }
+
+    // Initialize filters
+    function initializeFilters() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => {
+            b.classList.remove('bg-indigo-100', 'text-indigo-700');
+            b.classList.add('text-gray-600');
+          });
+          btn.classList.remove('text-gray-600');
+          btn.classList.add('bg-indigo-100', 'text-indigo-700');
+          currentFilter = btn.dataset.filter;
+          renderLeads();
+        });
+      });
+      
+      elements.searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderLeads();
+      });
+      
+      elements.sourceFilter.addEventListener('change', (e) => {
+        currentSourceFilter = e.target.value;
+        renderLeads();
+      });
+    }
+
+    // Initialize event listeners
+    function initializeEventListeners() {
+      document.getElementById('add-lead-btn').addEventListener('click', () => openModal());
+      document.getElementById('empty-add-btn').addEventListener('click', () => openModal());
+      document.getElementById('close-modal').addEventListener('click', closeModals);
+      document.getElementById('cancel-btn').addEventListener('click', closeModals);
+      document.getElementById('close-details').addEventListener('click', closeModals);
+      document.getElementById('edit-from-details').addEventListener('click', () => openEditModal(editingLead));
+      document.getElementById('delete-from-details').addEventListener('click', () => {
+        elements.detailsModal.classList.add('hidden');
+        showDeleteConfirmation(editingLead);
+      });
+      document.getElementById('cancel-delete').addEventListener('click', closeModals);
+      document.getElementById('confirm-delete').addEventListener('click', handleDelete);
+      elements.leadForm.addEventListener('submit', handleSubmit);
+      
+      // Close modals on backdrop click
+      [elements.leadModal, elements.detailsModal, elements.deleteModal].forEach(modal => {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModals();
+        });
+      });
+    }
+
+    // Data handler for SDK
+    const dataHandler = {
+      onDataChanged(data) {
+        leads = data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        updateStats();
+        renderLeads();
+        
+        // Show/hide limit warning
+        elements.limitWarning.classList.toggle('hidden', leads.length < 999);
+      }
+    };
+
+    // Element SDK setup
+    async function initializeElementSdk() {
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange: async (config) => {
+            elements.appTitle.textContent = config.app_title || defaultConfig.app_title;
+            elements.welcomeMsg.textContent = config.welcome_message || defaultConfig.welcome_message;
+            
+            // Apply colors
+            document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
+            document.querySelectorAll('.lead-card, #lead-modal > div, #details-modal > div, #delete-modal > div').forEach(el => {
+              el.style.backgroundColor = config.surface_color || defaultConfig.surface_color;
+            });
+          },
+          mapToCapabilities: (config) => ({
+            recolorables: [
+              {
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (v) => window.elementSdk.setConfig({ background_color: v })
+              },
+              {
+                get: () => config.surface_color || defaultConfig.surface_color,
+                set: (v) => window.elementSdk.setConfig({ surface_color: v })
+              },
+              {
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (v) => window.elementSdk.setConfig({ text_color: v })
+              },
+              {
+                get: () => config.primary_action || defaultConfig.primary_action,
+                set: (v) => window.elementSdk.setConfig({ primary_action: v })
+              },
+              {
+                get: () => config.secondary_action || defaultConfig.secondary_action,
+                set: (v) => window.elementSdk.setConfig({ secondary_action: v })
+              }
+            ],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ['app_title', config.app_title || defaultConfig.app_title],
+            ['welcome_message', config.welcome_message || defaultConfig.welcome_message]
+          ])
+        });
+      }
+    }
+
+    // Initialize Data SDK
+    async function initializeDataSdk() {
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Failed to initialize Data SDK');
+          elements.loadingState.innerHTML = `
+            <div class="text-center py-16">
+              <svg class="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <p class="text-gray-600">Failed to load data. Please refresh the page.</p>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Initialize app
+    async function init() {
+      initializeFilters();
+      initializeEventListeners();
+      await initializeElementSdk();
+      await initializeDataSdk();
+    }
+
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9db39f1995cd3d30',t:'MTc3MzMyNzEzNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
